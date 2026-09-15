@@ -28,7 +28,7 @@ button{font-family:inherit;font-size:1rem}
 #clock{font-variant-numeric:tabular-nums;font-size:1.3rem;color:var(--gold);min-width:4.5rem;text-align:center}
 .spacer{flex:1}
 select{font-family:inherit;font-size:.95rem;background:var(--espresso);color:var(--cream);border:1px solid var(--sand);border-radius:999px;padding:.4rem .8rem;max-width:22rem}
-#cam{position:fixed;z-index:4;right:1rem;bottom:1rem;width:min(26vw,300px);border-radius:1rem;border:2px solid var(--gold);transform:scaleX(-1);background:#000;display:none}
+#cam{position:fixed;z-index:4;right:1rem;bottom:1rem;width:min(26vw,300px);aspect-ratio:9/16;object-fit:cover;border-radius:1rem;border:2px solid var(--gold);transform:scaleX(-1);background:#000;display:none}
 #cam.on{display:block}
 #cam.full{right:0;left:0;top:0;bottom:0;width:100%;height:100%;border:0;border-radius:0;object-fit:cover;opacity:.30;z-index:1}
 .hint{font-size:.85rem;color:rgba(234,219,200,.55)}
@@ -202,6 +202,30 @@ function toast(msg, ms=3500){ const t=$('toast'); t.textContent=msg; t.classList
 let recorder=null, chunks=[], recStart=0, recKind='audio', mediaStream=null;
 const AUDIO_WANTED = {echoCancellation:false, noiseSuppression:false, autoGainControl:false};
 
+/* 🔴 15/09: הדפדפן בטלפון מחזיר וידאו לרוחב גם כשמבקשים לאורך.
+   הפתרון: מציירים אותו על canvas של 1080x1920 (חיתוך מרכז) ומקליטים ממנו.
+   ⛔ בלי זה הריל יוצא 16:9 ולא ניתן לפרסום. */
+let rafId=null;
+function toPortrait(stream){
+  const cv=document.createElement('canvas'); cv.width=1080; cv.height=1920;
+  if(!cv.captureStream) return stream;            // דפדפן ישן: עדיף לרוחב מאשר כלום
+  const v=document.createElement('video');
+  v.srcObject=stream; v.muted=true; v.playsInline=true; v.play();
+  const ctx=cv.getContext('2d');
+  const draw=()=>{
+    const vw=v.videoWidth, vh=v.videoHeight;
+    if(vw&&vh){
+      const sc=Math.max(1080/vw,1920/vh), w=vw*sc, h=vh*sc;
+      ctx.drawImage(v,(1080-w)/2,(1920-h)/2,w,h);
+    }
+    rafId=requestAnimationFrame(draw);
+  };
+  draw();
+  const out=cv.captureStream(30);
+  stream.getAudioTracks().forEach(t=>out.addTrack(t));
+  return out;
+}
+
 function recBtn(){ return recKind==='video' ? $('recv') : $('rec'); }
 function recLabel(on){
   if(on) return '■ סיום הקלטה';
@@ -223,11 +247,13 @@ async function toggleRec(kind){
     const opts = mime ? {mimeType:mime} : {};
     if(wantVideo){ opts.videoBitsPerSecond = 8000000; opts.audioBitsPerSecond = 128000; }
     else { opts.audioBitsPerSecond = 128000; }
-    recorder = new MediaRecorder(mediaStream, opts);
+    const recStream = wantVideo ? toPortrait(mediaStream) : mediaStream;
+    recorder = new MediaRecorder(recStream, opts);
     chunks=[]; recStart=Date.now();
     if(wantVideo){ $('cam').srcObject = mediaStream; $('cam').classList.add('on'); }
     recorder.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
     recorder.onstop = ()=>{
+      if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
       mediaStream.getTracks().forEach(t=>t.stop());
       $('cam').classList.remove('on','full'); $('cam').srcObject = null;
       const ext = (recorder.mimeType||'').includes('mp4') ? 'mp4' : 'webm';
