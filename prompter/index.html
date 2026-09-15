@@ -69,7 +69,8 @@ select{font-family:inherit;font-size:.95rem;background:var(--espresso);color:var
   #bar h1{display:none}
   .hint{display:none}
   .spacer{display:none}
-  #top{display:none}
+  #top{padding:.3rem .5rem;font-size:1.15rem}
+  #top .lbl{display:none}
   .grp{font-size:.82rem;gap:.25rem}
   .grp input[type=range]{width:60px}
   .btn{padding:.3rem .6rem;font-size:.85rem}
@@ -80,7 +81,7 @@ select{font-family:inherit;font-size:.95rem;background:var(--espresso);color:var
   #scroll{padding-left:14px;padding-right:14px}
   #scroll p{overflow-wrap:anywhere}
 }
-#toast{position:fixed;bottom:1.2rem;right:50%;transform:translateX(50%);background:var(--olive-deep);color:var(--cream);padding:.7rem 1.3rem;border-radius:999px;font-size:1.05rem;z-index:50;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;text-align:center}
+#toast{position:fixed;top:.5rem;right:50%;transform:translateX(50%);background:#C96A5A;color:var(--cream);padding:.7rem 1.3rem;border-radius:999px;font-size:1.05rem;z-index:50;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;text-align:center}
 #toast.on{opacity:1}
 </style>
 </head>
@@ -90,7 +91,7 @@ select{font-family:inherit;font-size:.95rem;background:var(--espresso);color:var
   <h1>טלפרומפטר</h1>
   <select id="pick" title="בחירת תסריט"></select>
   <button class="btn main" id="play" title="רווח">▶ התחלה</button>
-  <button class="btn" id="top" title="Home">⤒ להתחלה</button>
+  <button class="btn" id="top" title="להתחלה">⤒<span class="lbl"> להתחלה</span></button>
   <div id="clock">0:00</div>
   <div class="grp">מהירות <input type="range" id="speed" min="8" max="120" value="32"><span id="speedv">32</span></div>
   <div class="grp">גודל <input type="range" id="size" min="34" max="120" value="66"><span id="sizev">66</span></div>
@@ -194,7 +195,10 @@ function countdown(n, done){
 }
 function showBar(){ bar.classList.remove('hidden'); clearTimeout(hideTimer); }
 function autoHide(){ clearTimeout(hideTimer); hideTimer=setTimeout(()=>{ if(running) bar.classList.add('hidden'); }, 2500); }
+/* 🔴 15/09, שרה: "הסימן העגול נורא מפריע, הוא ממש על הפרומפטר."
+   ⛔ אין יותר הודעות מידע. רק תקלה מופיעה, ובראש המסך. */
 function toast(msg, ms=3500){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'), ms); }
+function flash(btn, txt, ms=2500){ const o=btn.textContent; btn.textContent=txt; setTimeout(()=>{ btn.textContent=o; }, ms); }
 
 /* הקלטה · קול בלבד או קול+וידאו.
    ⚠️ הדפדפן שומר webm. להמרה: ffmpeg -i x.webm -c:v libx264 -crf 18 x.mp4
@@ -263,13 +267,11 @@ async function toggleRec(kind){
       const name = `${what} - ${cur.title} - ${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}.${pad(d.getMinutes())}.${ext}`;
       const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove();
       recBtn().classList.remove('on'); recBtn().textContent=recLabel(false);
-      toast('נשמר בהורדות: '+name+' · '+fmt((Date.now()-recStart)/1000), 8000);
+      flash(recBtn(), '✓ נשמר');
     };
     recorder.start(1000);
     recBtn().classList.add('on'); recBtn().textContent=recLabel(true);
-    toast(wantVideo
-      ? 'מקליטה וידאו. הקשה על התצוגה הקטנה פורשת אותה מאחורי הטקסט, כדי שתסתכלי למצלמה. רווח להתחלת הטקסט.'
-      : 'מקליטה. רווח להתחלת הטקסט.', 8000);
+    /* ⛔ אין הודעת פתיחה, הכפתור האדום מהבהב וזה מספיק */
   }catch(e){
     toast(wantVideo
       ? 'אין גישה למצלמה בדפדפן הזה. אפשר לצלם בטלפון מול המסך במקום.'
@@ -288,10 +290,10 @@ $('cues').onchange=()=>{ scroll.querySelectorAll('.cue').forEach(c=>c.classList.
 $('mirror').onchange=place;
 $('editbtn').onclick=()=>{ stop(false); $('ta').value=getScript(); $('edit').classList.add('on'); };
 $('cancel').onclick=()=>$('edit').classList.remove('on');
-$('save').onclick=()=>{ try{ localStorage.setItem(lsKey(cur.id),$('ta').value) }catch(e){} $('edit').classList.remove('on'); render(); toTop(); toast('הטקסט נשמר'); };
+$('save').onclick=()=>{ try{ localStorage.setItem(lsKey(cur.id),$('ta').value) }catch(e){} $('edit').classList.remove('on'); render(); toTop(); };
 $('reset').onclick=()=>{ $('ta').value=cur.text; try{ localStorage.removeItem(lsKey(cur.id)) }catch(e){} };
 $('pick').onchange=e=>{ cur=SCRIPTS[+e.target.value]; try{ localStorage.setItem(LS_PICK,e.target.value) }catch(e){}
-  render(); toTop(); if(cur.pending) toast('⚠️ בתסריט הזה יש שורה שממתינה לך. ראי את שורות ה-# האדומות.', 6000); };
+  render(); toTop();  };
 document.addEventListener('mousemove', ()=>{ showBar(); if(running) autoHide(); });
 document.addEventListener('keydown', e=>{
   if($('edit').classList.contains('on')) return;
